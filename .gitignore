@@ -1,0 +1,10 @@
+.vscode
+/node_modules/
+.idea/
+
+utils/build*/
+utils/emsdk/
+utils/opencv/
+utils/opencv_contrib/
+
+*.tgz
