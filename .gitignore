@@ -1,7 +1,7 @@
 .vscode
 /node_modules/
 .idea/
-
+dist/src/
 utils/build*/
 utils/emsdk/
 utils/opencv/
