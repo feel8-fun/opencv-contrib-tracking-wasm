@@ -1,4 +1,27 @@
+5c5
+<       return (root.cv = factory());
+---
+>       return (window.cv = factory());
+14c14
+<     root.cv = factory();
+---
+>     window.cv = factory();
+17c17
+<     root.cv = factory();
+---
+>     window.cv = factory();
+20c20
+<     root.cv = factory();
+---
+>     window.cv = factory();
 27c27
 <     Module = {};
 ---
 >     var Module = {};
+30c30,31
+<         
+\ No newline at end of file
+---
+> 
+> export default cv;
+\ No newline at end of file

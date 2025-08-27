@@ -3,7 +3,7 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   optimizeDeps: {
     // Force Vite to pre-bundle your CJS package
-    include: ['@feel8.fun/opencv-contrib-tracking-wasm']
+    exclude: ['@feel8.fun/opencv-contrib-tracking-wasm']
   },
   
   server: {
