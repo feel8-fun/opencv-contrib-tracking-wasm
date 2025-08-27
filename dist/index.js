@@ -1,7 +1,8 @@
-import { simd, threads } from "wasm-feature-detect";
+import { simd } from "wasm-feature-detect";
+const simdSupported = await simd();
 
 const cvLoadWASM = async () => {
-    const module = await import("./wasm/opencv.js");
+    const module = await import("./build_wasm_single/opencv.js");
     // OpenCV.js typically exports a default function that returns a promise
     if (typeof module.default === 'function') {
         return await module.default(); // Wait for OpenCV to initialize
@@ -11,47 +12,35 @@ const cvLoadWASM = async () => {
 };
 
 const cvLoadSIMD = async () => {
-    const module = await import("./wasm_simd/opencv.js");
+    const module = await import("./build_simd_single/opencv.js");
     if (typeof module.default === 'function') {
         return await module.default();
     }
     return module.cv || module.default || module;
 };
 
-const cvLoadSIMDThreads = async () => {
-    const module = await import("./wasm_simd/opencv.js");
-    if (typeof module.default === 'function') {
-        return await module.default();
-    }
-    return module.cv || module.default || module;
-};
+// const cvLoadSIMDThreads = async () => {
+//     const module = await import("./build_simd_threads_single/opencv.js");
+//     if (typeof module.default === 'function') {
+//         return await module.default();
+//     }
+//     return module.cv || module.default || module;
+// };
 
-const cvLoadThreads = async () => {
-    const module = await import("./wasm/opencv.js");
-    if (typeof module.default === 'function') {
-        return await module.default();
-    }
-    return module.cv || module.default || module;
-};
+// const cvLoadThreads = async () => {
+//     const module = await import("./build_threads_single/opencv.js");
+//     if (typeof module.default === 'function') {
+//         return await module.default();
+//     }
+//     return module.cv || module.default || module;
+// };
 
 const cvLoadAuto = async () => {
-
-    let simdSupported = await simd();
-    let threadsSupported = await threads();
-
     if (simdSupported) {
-        if (threadsSupported) {
-            return cvLoadSIMDThreads();
-        } else {
-            return cvLoadSIMD();
-        }
+        return cvLoadSIMD();
     } else {
-        if (threadsSupported) {
-            return cvLoadThreads();
-        } else {
-            return cvLoadWASM();
-        }
+        return cvLoadWASM();
     }
 };
 
-export { cvLoadWASM, cvLoadSIMD, cvLoadSIMDThreads, cvLoadThreads, cvLoadAuto };
+export { cvLoadWASM, cvLoadSIMD, cvLoadAuto };

@@ -1,10 +1,10 @@
 ## Basic Usage
 
 ``` js
-import cvReadyPromise from "@techstark/opencv-js";
+import { cvLoadAuto } from '@feel8.fun/opencv-contrib-tracking-wasm';
 
 async function main() {
-  const cv = await cvReadyPromise;
+  const cv = await cvLoadAuto();
   console.log("OpenCV.js is ready!");
   // You can now use OpenCV functions here
   console.log(cv.getBuildInformation());
