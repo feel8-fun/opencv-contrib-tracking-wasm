@@ -10,3 +10,12 @@ async function main() {
   console.log(cv.getBuildInformation());
 }
 ```
+
+
+### Credit
+
+- [opencv-wasm
+](https://github.com/echamudi/opencv-wasm)
+- [opencv-contrib-wasm](https://github.com/Hpmason/opencv-contrib-wasm/)
+- [opencv-js](https://github.com/TechStark/opencv-js)
+- [opencv-mobile](https://github.com/nihui/opencv-mobile)
