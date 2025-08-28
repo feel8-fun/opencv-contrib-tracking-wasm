@@ -4,17 +4,8 @@
   "description": "OpenCV WASM Javascript package for video tracking and optical flow including contrib. Slim and more powerful than Official JS.",
   "main": "dist/index.js",
   "files": [
-    "dist/",
-    "src/"
+    "dist/"
   ],
-  "devDependencies": {
-    "@types/jest": "^29.5.14",
-    "jest": "^29.7.0",
-    "jimp": "^1.6.0",
-    "prettier": "^3.5.3",
-    "ts-jest": "^29.3.4",
-    "typescript": "^5.9.2"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/feel8-fun/opencv-contrib-tracking-wasm.git"
