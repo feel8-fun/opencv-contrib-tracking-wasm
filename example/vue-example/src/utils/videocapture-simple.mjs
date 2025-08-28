@@ -1,5 +1,5 @@
 import PubSub from 'pubsub-js';
-import { ABBox, OBBox } from './boundingbox.mjs';
+import { BoxType } from './boundingbox.mjs';
 
 const defaultConfig = {
     topic_prefix: 'videocapture',
@@ -142,18 +142,15 @@ class VideoCaptureSimple {
      * Calculate output dimensions and scaling
      */
     calculateOutputDimensions() {
-        const videoWidth = this.video.videoWidth;
-        const videoHeight = this.video.videoHeight;
-
         // Determine source dimensions
         let sourceWidth, sourceHeight;
 
         if (this.roi) {
-            sourceWidth = this.roi.width * videoWidth;
-            sourceHeight = this.roi.height * videoHeight;
+            sourceWidth = this.roi.width;
+            sourceHeight = this.roi.height;
         } else {
-            sourceWidth = videoWidth;
-            sourceHeight = videoHeight;
+            sourceWidth = this.video.videoWidth;
+            sourceHeight = this.video.videoHeight;
         }
 
         // Calculate scale to fit within max dimensions
@@ -196,7 +193,7 @@ class VideoCaptureSimple {
         this.ctx.imageSmoothingQuality = 'high';
 
         if (this.roi) {
-            if (this.roi instanceof OBBox && this.roi.angle) {
+            if (this.roi.type === BoxType.OBBOX) {
                 this.captureRotatedROI(output);
             } else {
                 this.captureRectangularROI(output);
@@ -222,11 +219,12 @@ class VideoCaptureSimple {
             width: output.width,
             height: output.height,
             roi: this.roi ? {
+                type: this.roi.type,
                 x: this.roi.x,
                 y: this.roi.y,
                 width: this.roi.width,
                 height: this.roi.height,
-                angle: this.roi.angle || 0
+                angle: this.roi.angle || 0,
             } : null
         });
     }
@@ -235,14 +233,11 @@ class VideoCaptureSimple {
      * Capture rectangular ROI with scaling in one pass
      */
     captureRectangularROI(output) {
-        const videoWidth = this.video.videoWidth;
-        const videoHeight = this.video.videoHeight;
-
         // Convert normalized coordinates to pixel coordinates
-        const sourceX = this.roi.x * videoWidth;
-        const sourceY = this.roi.y * videoHeight;
-        const sourceWidth = this.roi.width * videoWidth;
-        const sourceHeight = this.roi.height * videoHeight;
+        const sourceX = this.roi.startX;
+        const sourceY = this.roi.startY;
+        const sourceWidth = this.roi.endX - this.roi.startX;
+        const sourceHeight = this.roi.endY - this.roi.startY;
 
         // Draw and scale in one operation
         this.ctx.drawImage(
@@ -256,15 +251,12 @@ class VideoCaptureSimple {
      * Capture rotated ROI with scaling in one pass
      */
     captureRotatedROI(output) {
-        const videoWidth = this.video.videoWidth;
-        const videoHeight = this.video.videoHeight;
-
         // Convert normalized coordinates to pixel coordinates
-        const sourceX = this.roi.x * videoWidth;
-        const sourceY = this.roi.y * videoHeight;
-        const sourceWidth = this.roi.width * videoWidth;
-        const sourceHeight = this.roi.height * videoHeight;
-        const angleRad = (this.roi.angle || 0) * Math.PI / 180;
+        const sourceCenterX = this.roi.centerX;
+        const sourceCenterY = this.roi.centerY;
+        const sourceWidth = this.roi.width;
+        const sourceHeight = this.roi.height;
+        const angleRad = this.roi.angle;
 
         // Save context state
         this.ctx.save();
@@ -277,14 +269,14 @@ class VideoCaptureSimple {
         this.ctx.rotate(angleRad);
 
         // Scale factor from source to output
-        const scale = output.scale;
+        // const scale = output.scale;
 
         // Draw the rotated and scaled ROI
         // We need to account for the center-based rotation
         this.ctx.drawImage(
             this.video,
-            sourceX - sourceWidth / 2,      // Adjusted source X (centered)
-            sourceY - sourceHeight / 2,      // Adjusted source Y (centered)
+            sourceCenterX,      // Adjusted source X (centered)
+            sourceCenterY,      // Adjusted source Y (centered)
             sourceWidth,                     // Source width
             sourceHeight,                    // Source height
             -output.width / 2,               // Destination X (centered)
@@ -310,4 +302,4 @@ class VideoCaptureSimple {
 }
 
 // Export classes
-export { VideoCaptureSimple, ABBox, OBBox };
+export { VideoCaptureSimple };

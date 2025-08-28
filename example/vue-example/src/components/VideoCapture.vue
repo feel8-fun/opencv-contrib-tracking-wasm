@@ -1,9 +1,10 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { ABBox, OBBox, VideoCaptureSimple } from '@/utils/videocapture-simple.mjs'
+import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
+import { VideoCaptureSimple } from '@/utils/videocapture-simple.mjs'
+import { BoundingBoxTool, BoxType } from '@/utils/boundingbox.mjs'
 import PubSub from 'pubsub-js'
 // Reactive state
-const isVideoActive = ref(false)
+const isVideoPlaying = ref(false)
 const error = ref('')
 const info = ref('')
 
@@ -17,28 +18,193 @@ const videoResolution = ref('0x0')
 
 // Refs for DOM elements
 const videoElement = ref(null)
+const videoCanvas = ref(null)
 const outputCanvas = ref(null)
 let outputCtx = null;
 // Processor
 let processor;
+let bboxtool;
+
+const togglePlayPause = () => {
+    videoElement.value.paused ? videoElement.value.play() : videoElement.value.pause();
+}
+const getVideoPlacement = (videoElement) => {
+    // Get the intrinsic (actual) video dimensions
+    const videoWidth = videoElement.videoWidth;
+    const videoHeight = videoElement.videoHeight;
+
+    // Get the displayed video element dimensions
+    const elementWidth = videoElement.clientWidth;
+    const elementHeight = videoElement.clientHeight;
+
+    // Calculate aspect ratios
+    const videoAspectRatio = videoWidth / videoHeight;
+    const elementAspectRatio = elementWidth / elementHeight;
+
+    let displayWidth, displayHeight, offsetX, offsetY;
+
+    if (videoAspectRatio > elementAspectRatio) {
+        // Video is wider than element (letterboxing - black bars top/bottom)
+        displayWidth = elementWidth;
+        displayHeight = elementWidth / videoAspectRatio;
+        offsetX = 0;
+        offsetY = (elementHeight - displayHeight) / 2;
+    } else {
+        // Video is taller than element (pillarboxing - black bars on sides)
+        displayHeight = elementHeight;
+        displayWidth = elementHeight * videoAspectRatio;
+        offsetX = (elementWidth - displayWidth) / 2;
+        offsetY = 0;
+    }
+
+    return {
+        // Actual video display dimensions
+        displayWidth: displayWidth,
+        displayHeight: displayHeight,
+        // Offsets from top-left corner of video element
+        offsetX: offsetX,
+        offsetY: offsetY,
+        // Original video dimensions
+        videoWidth: videoWidth,
+        videoHeight: videoHeight,
+        // Element dimensions
+        elementWidth: elementWidth,
+        elementHeight: elementHeight,
+        // Scaling factor
+        scale: displayWidth / videoWidth
+    };
+}
+
+const mapToVideoCoordinates = (box) => {
+    // Input validation
+    if (!box || typeof box !== 'object') {
+        throw new Error('Invalid box parameter provided');
+    }
+    if (!videoElement.value) {
+        throw new Error('Video element is not available');
+    }
+    const { scale, offsetX, offsetY } = getVideoPlacement(videoElement.value);
+    if (box.type === BoxType.ABBOX) {
+        return {
+            ...box,
+            startX: box.startX / scale + offsetX,
+            startY: box.startY / scale + offsetY,
+            endX: box.endX / scale + offsetX,
+            endY: box.endY / scale + offsetY,
+        };
+    } else {
+        return {
+            ...box,
+            centerX: box.centerX / scale + offsetX,
+            centerY: box.centerY / scale + offsetY,
+            width: box.width / scale,
+            height: box.height / scale
+        };
+    }
+}
+
+const isSettingRectROI = ref(false);
+const isSettingRotatedROI = ref(false);
+const toggleSetRectROI = () => {
+    if (isSettingRotatedROI.value) return
+    if (isSettingRectROI.value) {
+        isSettingRectROI.value = false;
+        videoCanvas.value.style.pointerEvents = 'none';
+        bboxtool.stop();
+        return
+    }
+
+    isSettingRectROI.value = true;
+    videoCanvas.value.style.pointerEvents = 'auto';
+    bboxtool.setMode(BoxType.ABBOX);
+    bboxtool.clear();
+    bboxtool.start();
+
+
+    // Update canvas dimensions   
+
+    PubSub.subscribeOnce(bboxtool.TOPICS.DRAW_END, (msg, data) => {
+        bboxtool.stop();
+        const roi = mapToVideoCoordinates(bboxtool.boxes[0]);
+        processor.setROI(roi);
+        videoCanvas.value.style.pointerEvents = 'none';
+        isSettingRectROI.value = false;
+    });
+
+    PubSub.subscribeOnce(bboxtool.TOPICS.DRAW_CANCELLED, (msg, reason) => {
+        console.info("Drawing cancelled:", reason);
+        videoCanvas.value.style.pointerEvents = 'none';
+        isSettingRectROI.value = false;
+    });
+}
+
+const toggleSetRotatedROI = () => {
+    if (isSettingRectROI.value) return
+    if (isSettingRotatedROI.value) {
+        isSettingRotatedROI.value = false;
+        videoCanvas.value.style.pointerEvents = 'none';
+        bboxtool.stop();
+        return
+    }
+    isSettingRotatedROI.value = true;
+    videoCanvas.value.style.pointerEvents = 'auto';
+
+    bboxtool.setMode(BoxType.OBBOX);
+    bboxtool.clear();
+    bboxtool.start();
+
+    PubSub.subscribeOnce(bboxtool.TOPICS.DRAW_END, (msg, data) => {
+
+        bboxtool.stop();
+        const roi = mapToVideoCoordinates(bboxtool.boxes[0]);
+        processor.setROI(roi);
+        videoCanvas.value.style.pointerEvents = 'none';
+        isSettingRotatedROI.value = false;
+    });
+
+    PubSub.subscribeOnce(bboxtool.TOPICS.DRAW_CANCELLED, (msg, reason) => {
+        console.info("Drawing cancelled:", reason);
+        bboxtool.stop();
+        videoCanvas.value.style.pointerEvents = 'none';
+        isSettingRotatedROI.value = false;
+    });
+}
+
+const onClearROI = () => {
+    isSettingRotatedROI.value = false;
+    isSettingRectROI.value = false;
+
+    bboxtool.clear();
+    bboxtool.stop();
+    videoCanvas.value.style.pointerEvents = 'none';
+    PubSub.unsubscribe(bboxtool.TOPICS.BOX_CREATED);
+    PubSub.unsubscribe(bboxtool.TOPICS.DRAW_CANCELLED);
+    processor.setROI(null);
+}
 
 // Event handlers for video
 const handlePlay = () => {
-    isVideoActive.value = true
+    isVideoPlaying.value = true
     processor.start()
 }
 const handlePause = () => {
-    isVideoActive.value = false;
+    isVideoPlaying.value = false;
     processor.stop()
 
 }
 const handleEnded = () => {
-    isVideoActive.value = false
+    isVideoPlaying.value = false
     processor.stopProcessing()
 }
 
 const handleLoadedData = () => {
+    console.info(videoElement.value)
     videoResolution.value = `${videoElement.value.videoWidth}x${videoElement.value.videoHeight}`
+
+    const videoBox = videoElement.value.getBoundingClientRect();
+    // Update canvas dimensions
+    videoCanvas.value.width = videoBox.width;
+    videoCanvas.value.height = videoBox.height;
 }
 
 const costHistory = [];
@@ -56,19 +222,20 @@ onMounted(async () => {
     }
     processor = new VideoCaptureSimple(videoElement.value, {
         fps: targetFPS.value,
-        roi: new ABBox(0.4, 0.2, 0.2, 0.8) // Default to full video
+        // roi: new ABBox(0.4, 0.2, 0.2, 0.8) // Default to full video
     });
     outputCtx = outputCanvas.value.getContext('2d');
 
     // Subscribe to captured frames
-    const frameSub = PubSub.subscribe('video.frame.captured', (topic, data) => {
-        if (data.frameId == 0) {
-            // set canvas dimensions
-            outputCanvas.value.width = data.width;
-            outputCanvas.value.height = data.height;
-            videoResolution.value = `${data.width}x${data.height}`;
-        }
-        
+    const frameSub = PubSub.subscribe(processor.TOPICS.FRAME_CAPTURED, (topic, data) => {
+        // console.info(outputCanvas.value, data)
+        // if (outputCanvas.value.width != data.width || outputCanvas.value.height != data.height) {
+        //     videoResolution.value = `${data.width}x${data.height}`;
+        //     console.info("Video resolution changed:", outputCanvas.value, data.width, data.height);
+        //     outputCanvas.value.width = data.width;
+        //     outputCanvas.value.height = data.height;
+        // }
+
         // Process the frame data
         const { imageData } = data;
 
@@ -76,7 +243,7 @@ onMounted(async () => {
         outputCtx.putImageData(imageData, 0, 0);
     });
 
-    const costSub = PubSub.subscribe('video.frame.cost', (topic, data) => {
+    const costSub = PubSub.subscribe('videocapture.cost', (topic, data) => {
 
         processingTime.value = data.cost;
         costHistory.push(data.cost);
@@ -85,6 +252,14 @@ onMounted(async () => {
         }
         avgProcessingTime.value = costHistory.reduce((a, b) => a + b, 0) / costHistory.length;
     });
+
+    bboxtool = new BoundingBoxTool(videoCanvas.value, {
+        features: {
+            showGrid: false,
+        }
+    });
+    bboxtool.setMode(BoxType.OBBOX)
+    // boundingBoxDemo= new BoundingBoxDemo(videoElement.value);
 })
 
 onUnmounted(() => {
@@ -96,8 +271,6 @@ onUnmounted(() => {
         videoElement.value.removeEventListener('loadeddata', handleLoadedData)
     }
     processor.stop();
-    PubSub.unsubscribe(frameSub);
-    PubSub.unsubscribe(costSub);
     processor.destroy();
 })
 
@@ -124,6 +297,12 @@ onUnmounted(() => {
             <div class="control-group">
 
                 <div class="slider-group">
+                    <button @click="togglePlayPause"> {{ isVideoPlaying ? 'Pause' : 'Play' }}</button>
+                    <button @click="toggleSetRectROI" :disabled="isSettingRotatedROI">
+                        {{ isSettingRectROI ? "Cancel" : "Set Rect ROI" }}</button>
+                    <button @click="toggleSetRotatedROI" :disabled="isSettingRectROI">
+                        {{ isSettingRotatedROI ? "Cancel" : "Set Rotated ROI" }}</button>
+                    <button @click="onClearROI">Clear ROI</button>
                     <label>Target FPS:</label>
                     <input type="range" v-model="targetFPS" min="5" max="60" step="5" class="slider">
                     <span>{{ targetFPS }}</span>
@@ -137,6 +316,7 @@ onUnmounted(() => {
                     <video ref="videoElement" class="video-element" controls crossorigin="anonymous">
                         <source src="/1.mp4" type="video/mp4">
                     </video>
+                    <canvas ref="videoCanvas" class="video-overlay-canvas"></canvas>
                     <div class="video-overlay">Original Video</div>
                 </div>
                 <div class="video-container">
@@ -340,10 +520,16 @@ onUnmounted(() => {
     width: 100%;
     height: 100%;
     object-fit: contain;
-    display: block;
+    /* display: block; */
 }
 
-
+.video-overlay-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    background: transparent;
+    pointer-events: none;
+}
 
 .video-overlay {
     position: absolute;
