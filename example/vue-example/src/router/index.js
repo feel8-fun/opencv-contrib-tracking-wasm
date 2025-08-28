@@ -1,9 +1,12 @@
 import { createMemoryHistory, createRouter } from 'vue-router'
 
-import BuildInfo from '../components/BuildInfo.vue'
+import BuildInfo from '@/components/BuildInfo.vue';
+import OpticalFlow from '@/components/OpticalFlow.vue';
 
 const routes = [
-  { path: '/', component: BuildInfo },
+  { path: '/', component: OpticalFlow },
+  { path: '/buildinfo', component: BuildInfo },
+  { path: '/opticalflow', component: OpticalFlow },
 ]
 
 const router = createRouter({
