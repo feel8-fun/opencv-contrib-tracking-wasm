@@ -40,6 +40,7 @@ function apply_patch()
 for i in "${target_list[@]}";
 do
   mkdir -p ../dist/$i
+  rm -r ../dist/$i/*
   cp $i/bin/opencv.js ../dist/$i/opencv.js
   apply_patch ../dist/$i/opencv.js
 
