@@ -40,7 +40,7 @@ function apply_patch()
 for i in "${target_list[@]}";
 do
   mkdir -p ../dist/$i
-  rm -r ../dist/$i/*
+  rm -f ../dist/$i/* 
   cp $i/bin/opencv.js ../dist/$i/opencv.js
   apply_patch ../dist/$i/opencv.js
 
@@ -59,12 +59,7 @@ done
 # emsdk/emsdk activate latest
 # source emsdk/emsdk_env.sh
 
-# emcmake python opencv/platforms/js/build_js.py build_wasm --build_wasm --cmake_option="-DOPENCV_EXTRA_MODULES_PATH=$script_dir/opencv_contrib/modules"
+# emcmake python opencv/platforms/js/build_js.py build_wasm_DBG --build_wasm --cmake_option="-DOPENCV_EXTRA_MODULES_PATH=$script_dir/opencv_contrib/modules"
 # mkdir -p ../dist/wasm/
 # cp build_wasm/bin/opencv.js ../dist/wasm/
 # apply_patch ../dist/wasm/opencv.js 
-
-# emcmake python opencv/platforms/js/build_js.py build_wasm_simd --build_wasm --cmake_option="-DOPENCV_EXTRA_MODULES_PATH=$script_dir/opencv_contrib/modules" --simd
-# mkdir -p ../dist/wasm_simd/
-# cp build_wasm_simd/bin/opencv.js ../dist/wasm_simd/
-# apply_patch ../dist/wasm_simd/opencv.js
